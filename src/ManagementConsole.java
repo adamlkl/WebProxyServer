@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.Socket;
@@ -25,6 +26,8 @@ public class ManagementConsole implements Runnable{
 	PrintWriter pw;
 	OutputStream os;
 	private static HttpURLConnection con;
+	private static HttpsURLConnection cons;
+	private Thread httpsClientToServer;
 	
 	public ManagementConsole(Socket clientSocket){
 		this.client = clientSocket;
@@ -84,10 +87,10 @@ public class ManagementConsole implements Runnable{
 		URL url;
 		try{
 			url = new URL(HTTPSRequestURL);
-			HttpsURLConnection con = (HttpsURLConnection)url.openConnection();
+			cons = (HttpsURLConnection)url.openConnection();
 			StringBuilder content;
 	        try (BufferedReader in = new BufferedReader(
-                    new InputStreamReader(con.getInputStream()))) {
+                    new InputStreamReader(cons.getInputStream()))) {
 
                 String line;
                 content = new StringBuilder();
@@ -105,15 +108,15 @@ public class ManagementConsole implements Runnable{
 	    } catch (IOException e) {
 		     e.printStackTrace();
 	    } finally{
-	    	con.disconnect();
+	    	cons.disconnect();
 	    }
 	}
-		
+	
 	//http://diptera.myspecies.info/;
 	private void sendGETRequest(String URLlink){
 		try {
 	        URL myurl = new URL(URLlink);
-	        con = (HttpURLConnection) myurl.openConnection();
+	        HttpURLConnection con = (HttpURLConnection) myurl.openConnection();
 	
 	        con.setRequestMethod("GET");
 	        
@@ -203,7 +206,7 @@ public class ManagementConsole implements Runnable{
 		String [] reqBlock = req.split(" ");
 		
 		// handles http connection 
-		if (reqBlock[0].equalsIgnoreCase("Connect")){
+		if (reqBlock[0].equalsIgnoreCase("GET")){
 			// this must be case sensitive 
 			String reqURL = formatURL(reqBlock[1],"http://");		
 			if(ProxyServer.isBlocked(reqURL)){
@@ -225,7 +228,7 @@ public class ManagementConsole implements Runnable{
 		}
 		
 		// handling https connection
-		else if (reqBlock[0].equalsIgnoreCase("Connects")){
+		else if (reqBlock[0].equalsIgnoreCase("link")){
 			String reqURL = formatURL(reqBlock[1],"https://");
 			if(ProxyServer.isBlocked(reqURL)){
 				blockedURLRequested(reqURL);
@@ -235,8 +238,167 @@ public class ManagementConsole implements Runnable{
 			else{
 				pw.println("Connecting to " + reqURL + "....");
 				connectHTTPSRequest(reqURL);
+				handleHTTPSRequest(reqURL);
 				pw.println("Connection to " + reqURL +  " established");
 			}
 		}
 	}
+	
+	/**
+	 * Handles HTTPS requests between client and remote server
+	 * @param urlString desired file to be transmitted over https
+	 */
+	private void handleHTTPSRequest(String urlString){
+		// Extract the URL and port of remote 
+		String url = urlString.substring(7);
+		String pieces[] = url.split(":");
+		url = pieces[0];
+		int port  = Integer.valueOf(pieces[1]);
+
+		try{
+			// Only first line of HTTPS request has been read at this point (CONNECT *)
+			// Read (and throw away) the rest of the initial data on the stream
+			for(int i=0;i<5;i++){
+				clientReq.readLine();
+			}
+
+			// Get actual IP associated with this URL through DNS
+			InetAddress address = InetAddress.getByName(url);
+			
+			// Open a socket to the remote server 
+			Socket proxyToServerSocket = new Socket(address, port);
+			proxyToServerSocket.setSoTimeout(5000);
+
+			// Send Connection established to the client
+			String line = "HTTP/1.0 200 Connection established\r\n" +
+					"Proxy-Agent: ProxyServer/1.0\r\n" +
+					"\r\n";
+			serverRes.write(line);
+			serverRes.flush();
+			
+			
+			
+			// Client and Remote will both start sending data to proxy at this point
+			// Proxy needs to asynchronously read data from each party and send it to the other party
+
+
+			//Create a Buffered Writer betwen proxy and remote
+			BufferedWriter proxyToServerBW = new BufferedWriter(new OutputStreamWriter(proxyToServerSocket.getOutputStream()));
+
+			// Create Buffered Reader from proxy and remote
+			BufferedReader proxyToServerBR = new BufferedReader(new InputStreamReader(proxyToServerSocket.getInputStream()));
+
+
+			// Create a new thread to listen to client and transmit to server
+			ClientToServerHttpsTransmit clientToServerHttps = 
+					new ClientToServerHttpsTransmit(client.getInputStream(), proxyToServerSocket.getOutputStream());
+			
+			httpsClientToServer = new Thread(clientToServerHttps);
+			httpsClientToServer.start();
+			
+			
+			// Listen to remote server and relay to client
+			try {
+				byte[] buffer = new byte[4096];
+				int read;
+				do {
+					read = proxyToServerSocket.getInputStream().read(buffer);
+					if (read > 0) {
+						client.getOutputStream().write(buffer, 0, read);
+						if (proxyToServerSocket.getInputStream().available() < 1) {
+							client.getOutputStream().flush();
+						}
+					}
+				} while (read >= 0);
+			}
+			catch (SocketTimeoutException e) {
+				
+			}
+			catch (IOException e) {
+				e.printStackTrace();
+			}
+
+
+			// Close Down Resources
+			if(proxyToServerSocket != null){
+				proxyToServerSocket.close();
+			}
+
+			if(proxyToServerBR != null){
+				proxyToServerBR.close();
+			}
+
+			if(proxyToServerBW != null){
+				proxyToServerBW.close();
+			}
+
+			if(serverRes != null){
+				serverRes.close();
+			}
+			
+			
+		} catch (SocketTimeoutException e) {
+			String line = "HTTP/1.0 504 Timeout Occured after 10s\n" +
+					"User-Agent: ProxyServer/1.0\n" +
+					"\r\n";
+			try{
+				serverRes.write(line);
+				serverRes.flush();
+			} catch (IOException ioe) {
+				ioe.printStackTrace();
+			}
+		} 
+		catch (Exception e){
+			System.out.println("Error on HTTPS : " + urlString );
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * Listen to data from client and transmits it to server.
+	 * This is done on a separate thread as must be done 
+	 * asynchronously to reading data from server and transmitting 
+	 * that data to the client. 
+	 */
+	class ClientToServerHttpsTransmit implements Runnable{
+		
+		InputStream proxyToClientIS;
+		OutputStream proxyToServerOS;
+		
+		/**
+		 * Creates Object to Listen to Client and Transmit that data to the server
+		 * @param proxyToClientIS Stream that proxy uses to receive data from client
+		 * @param proxyToServerOS Stream that proxy uses to transmit data to remote server
+		 */
+		public ClientToServerHttpsTransmit(InputStream proxyToClientIS, OutputStream proxyToServerOS) {
+			this.proxyToClientIS = proxyToClientIS;
+			this.proxyToServerOS = proxyToServerOS;
+		}
+
+		@Override
+		public void run(){
+			try {
+				// Read byte by byte from client and send directly to server
+				byte[] buffer = new byte[4096];
+				int read;
+				do {
+					read = proxyToClientIS.read(buffer);
+					if (read > 0) {
+						proxyToServerOS.write(buffer, 0, read);
+						if (proxyToClientIS.available() < 1) {
+							proxyToServerOS.flush();
+						}
+					}
+				} while (read >= 0);
+			}
+			catch (SocketTimeoutException ste) {
+				// TODO: handle exception
+			}
+			catch (IOException e) {
+				System.out.println("Proxy to client HTTPS read timed out");
+				e.printStackTrace();
+			}
+		}
+	}
+	
 }
