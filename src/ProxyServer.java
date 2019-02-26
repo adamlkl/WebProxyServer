@@ -9,6 +9,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -44,10 +45,28 @@ public class ProxyServer implements Runnable{
 		
 	}
 	
+	class Wrapper{
+		File file;
+		long date;
+		
+		public Wrapper(File file, long date){
+			this.file = file;
+			this.date = date;
+		}
+		
+		public File getFile(){
+			return this.file;
+		}
+		
+		public long getDate(){
+			return this.date;
+		}
+	}
+	
 	private void loadList(){
 		try{
-			File file = new File("CachedURL.ser");
-			
+			//File file = new File("CachedURL.ser");
+			File file = new File("CachedURL2.ser");
 			if(!file.exists()){
 				System.out.println("Error: CachedURL.ser does not exist");
 				file.createNewFile();
@@ -98,20 +117,50 @@ public class ProxyServer implements Runnable{
 	}
 	
 	// handle proper caching when new get request done
-	private void caching(){
-		
+	public static void caching(String URL, File file, long date){
+		CachedList.put(URL, file);	
 	}
 	
-	public static boolean isBlocked(String URL){
-		return BlockedList.contains(URL);
+	public static boolean isBlocked(String url){
+		String host="";
+		try {
+			host = new URL(url).getHost();
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		}
+		return BlockedList.contains(host);
 	}
 	
 	// get cache webpage
-	public static File getCachedPage(String URL){
-		System.out.println("Checking cache copy for " + URL);
-		return CachedList.get(URL);
+	public static File getCachedPage(String urlLink){
+		System.out.println("Checking cache copy for " + urlLink);
+		URL url;
+		long date = 0;
+		try {
+			url = new URL(urlLink);
+			HttpURLConnection httpCon = (HttpURLConnection) url.openConnection();
+
+		    date = httpCon.getLastModified();
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	    
+	    if (date == 0){
+	    	System.out.println("No last-modified information.");
+	    	return CachedList.get(urlLink);
+	    }
+	    else{
+	      System.out.println("Last-Modified: " + new Date(date));
+		  return CachedList.get(urlLink);
+	    }
 	}
 		
+	public static boolean hasCachedCopy(String URL){
+		return CachedList.get(URL)!=null;
+	}
+	
 	//caching webpages 
 	public static void cachePage(String URL, File file){
 		CachedList.put(URL, file);	
@@ -122,8 +171,7 @@ public class ProxyServer implements Runnable{
 		active = false;
 		
 		// save all blocked sites and cache sites to txt.file
-		try {
-			
+		try {	
 			System.out.println("Saving cached URL sites to CachedURL.ser ....");
 			FileOutputStream cachedFile = new FileOutputStream("CachedURL.ser",false);
 			ObjectOutputStream oos = new ObjectOutputStream(cachedFile);
@@ -221,13 +269,33 @@ public class ProxyServer implements Runnable{
 			}		
 			
 			else if(instruction.substring(0,5).equalsIgnoreCase("Block")){
-				BlockedList.add(instruction.substring(6));
-				System.out.println("Blocking " + instruction.substring(6));
+				String host="";
+				try {
+					host = new URL(instruction.substring(6)).getHost();
+					System.out.println(host);
+				} catch (MalformedURLException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				if(!host.isEmpty()){
+					BlockedList.add(host);
+					System.out.println("Blocking " + host);
+				}			
 			}
 			
 			else if(instruction.substring(0,7).equalsIgnoreCase("Unblock")){
-				BlockedList.remove(instruction.substring(8));
-				System.out.println("Unblocking " + instruction.substring(8));
+				String host="";
+				try {
+					host = new URL(instruction.substring(8)).getHost();
+					System.out.println(host);
+				} catch (MalformedURLException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				if(!host.isEmpty()){
+					BlockedList.remove(host);
+					System.out.println("Blocking " + host);
+				}			
 			}
 		}
 		InputScanner.close();
