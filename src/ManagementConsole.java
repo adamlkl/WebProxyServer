@@ -428,6 +428,7 @@ public class ManagementConsole implements Runnable{
 	                if(caching)	filebw.write(line);          
 	            }
 	            // print traffic data in console
+	            System.out.println("no of bytes:" + content.toString().length());
 	            System.out.println(content.toString());
 	            
 	            // close buffered reader after operation

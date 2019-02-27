@@ -66,7 +66,7 @@ public class ProxyServer implements Runnable{
 	private void loadList(){
 		try{
 			//File file = new File("CachedURL.ser");
-			File file = new File("CachedURL2.ser");
+			File file = new File("CachedURL.ser");
 			if(!file.exists()){
 				System.out.println("Error: CachedURL.ser does not exist");
 				file.createNewFile();
