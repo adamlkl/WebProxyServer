@@ -23,12 +23,13 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLPeerUnverifiedException;
 
 public class ManagementConsole implements Runnable{
-	
+	//initialize variables
 	Socket client;
 	BufferedReader clientReq; 
 	BufferedWriter serverRes;
 	private Thread ClientToServerHTTPSConnection;
 	
+	// suppose to be request handler but can't change name as file was created 
 	public ManagementConsole(Socket clientSocket){
 		this.client = clientSocket;
 		try{			
@@ -43,6 +44,7 @@ public class ManagementConsole implements Runnable{
 		} 
 	}
 	
+	// creates a thread to enable continious stream of data flow
 	class HTTPSTransmission implements Runnable{
 		
 		// input stream from proxy to client
@@ -102,6 +104,9 @@ public class ManagementConsole implements Runnable{
 		
 	}
 	
+	
+	// application to print certs of https site
+	// possible if using https connection 
 	private void printCertificate(String https_url){
 		try {
 			URL url = new URL(https_url);
@@ -248,11 +253,15 @@ public class ManagementConsole implements Runnable{
 		}
 	}
 	
+	// handling https request 
 	private void HandleGETRequestWithCachedCopy(String urlLink){
+		// get file from cache
 		File file = ProxyServer.getCachedPage(urlLink);
+		//try to get the file type
 		String fileType = file.getName().substring(file.getName().lastIndexOf("."));
 		
 		try{
+			// if file is image
 			if((fileType.contains(".jpeg")) || fileType.contains(".jpg") ||
 					fileType.contains(".gif") || fileType.contains(".png")){
 				
@@ -281,9 +290,11 @@ public class ManagementConsole implements Runnable{
 				}
 			}
 			
+			// if file is text based
 			else {
 				BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
-
+				
+				// send response code 
 				String res = "HTTP/1.0 200 OK\n" +
 							 "Proxy-agent: ProxyServer/1.0\n" +
 							 "\r\n";
@@ -440,6 +451,7 @@ public class ManagementConsole implements Runnable{
 				ProxyServer.cachePage(urlLink, file);
 			}
 			
+			//close down resources
 			if(filebw!=null)filebw.close();
 			if(serverRes!=null)serverRes.close();
 		}catch (MalformedURLException e){
@@ -451,10 +463,12 @@ public class ManagementConsole implements Runnable{
 	    }
 	}
 	
+	//run the thread request handler
 	@Override
 	public void run(){
 		String input;
 		try {
+			// read inputs 
 			input = clientReq.readLine();
 			System.out.println("Socket " + client.getLocalPort() + " Request: " + input);
 		} catch (IOException e) {
@@ -463,6 +477,7 @@ public class ManagementConsole implements Runnable{
 			return;
 		}
 
+		// get url n its type
 		String[] split = input.split(" ");
 		String req = split[0];
 		String url = split[1];
@@ -477,19 +492,24 @@ public class ManagementConsole implements Runnable{
 			e.printStackTrace();
 		}
 		
+		// check if the site is blocked, send forbidden message 
 		if (ProxyServer.isBlocked(url)){
 			System.out.println(url + " site connection is blocked");
 			blockedURLRequested(url);
 			return;
 		}
 		
+		// if not blocked
 		else{
+			// send https connection
 			if(req.equals("CONNECT")){			
 				System.out.println("Connecting to: " +url);
 				connectHTTPSRequest(url);
 			}
 			
+			// send http connection
 			else{
+				// handle connection with cached copy
 				if(ProxyServer.hasCachedCopy(url)){
 					System.out.println("Cache copy found for HTTP GET" + url);
 					long currentTime = System.currentTimeMillis();
@@ -497,6 +517,7 @@ public class ManagementConsole implements Runnable{
 					long diff = System.currentTimeMillis() - currentTime;
 					System.out.println("With Cache: " + diff);
 				}
+				// establish http connection since no copy for requested site 
 				else{
 					System.out.println("Cache copy not found for HTTP GET" + url);
 					long currentTime = System.currentTimeMillis();

@@ -18,18 +18,21 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 
 public class ProxyServer implements Runnable{
+	//initialise variables
 	static HashSet<String> BlockedList;
 	static HashMap<String, File> CachedList;
 	static ArrayList<Thread> ActiveThreadsList;
 	private volatile boolean active = true;
 	private ServerSocket ProxySocket;
 	
+	// constructor for proxy server 
 	public ProxyServer(int portNumber, int maxQueue){
 		//initialise data structures 
 		BlockedList = new HashSet<String>();
 		ActiveThreadsList = new ArrayList<Thread>();
 		CachedList = new HashMap<String,File>();
 		
+		//start server thread and socket afterwards 
 		Thread serverthread = new Thread(this);
 		serverthread.start();
 		try {
@@ -45,6 +48,7 @@ public class ProxyServer implements Runnable{
 		
 	}
 	
+	// not needed currently only for improvement purposes 
 	class Wrapper{
 		File file;
 		long date;
@@ -63,6 +67,7 @@ public class ProxyServer implements Runnable{
 		}
 	}
 	
+	// set up proxy server load back previous stored cached list and blocked ones as well
 	private void loadList(){
 		try{
 			//File file = new File("CachedURL.ser");
@@ -196,6 +201,7 @@ public class ProxyServer implements Runnable{
 		}
 		closeThreads();
 		try {
+			// close server socket
 			ProxySocket.close();
 		} catch (IOException e) {
 			System.out.println("Error: Server Terminating Failed");
@@ -205,7 +211,7 @@ public class ProxyServer implements Runnable{
 	}
 	
 	private void closeThreads(){
-		
+		// close all remaining active threads
 		for(Thread clientThread : ActiveThreadsList){
 			if(clientThread.isAlive()){
 				System.out.println("Closing thread" + clientThread.getId());
@@ -219,6 +225,7 @@ public class ProxyServer implements Runnable{
 		}
 	}
 	
+	// create pools of threads and listens to them 
 	public void listen(){		
 		while(active){
 			try {	
@@ -237,7 +244,7 @@ public class ProxyServer implements Runnable{
 		}
 	}
 	
-
+	// console for administrator to make changes 
 	@Override
 	public void run() {
 		Scanner InputScanner = new Scanner(System.in);
@@ -247,20 +254,13 @@ public class ProxyServer implements Runnable{
 			System.out.println("How can I help you?");
 			instruction = InputScanner.nextLine();
 			//handle commands 
-			if(instruction.equalsIgnoreCase("CL")){
-				
-			}
 			
-			else if(instruction.equalsIgnoreCase("BL")){
+			if(instruction.equalsIgnoreCase("BL")){
 				System.out.println("Blocked URL List:");
 				Iterator<String> bList = BlockedList.iterator();
 				while(bList.hasNext()){
 					System.out.println(bList.next());
 				}
-			}
-			
-			else if(instruction.equalsIgnoreCase("Help") || instruction.isEmpty()){
-				
 			}
 			
 			else if(instruction.equalsIgnoreCase("Quit")){
@@ -283,6 +283,7 @@ public class ProxyServer implements Runnable{
 				}			
 			}
 			
+			// unblock site 
 			else if(instruction.substring(0,7).equalsIgnoreCase("Unblock")){
 				String host="";
 				try {
