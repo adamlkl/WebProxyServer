@@ -1,4 +1,4 @@
-# WebProxyServer" #
+# WebProxyServer #
 
 ## Purpose ##
 The aim of this project is to implement a Web Proxy Server. The pdf version of the problem specification can be found here <a href="https://github.com/adamlkl/WebProxyServer/blob/master/documentation/CS3031_Proj1.pdf">here<a />.
