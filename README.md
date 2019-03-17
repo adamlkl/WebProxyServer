@@ -10,7 +10,7 @@ In computer networks, a proxy server is a server that acts as the intermediary a
 ## Design ##
 The web proxy server is divided into mainly two components: the web proxy server and a management console. This program is written using Java programming language.
 <img src="https://github.com/adamlkl/WebProxyServer/blob/master/documentation/image/design2.png" />
-* The functionalities of the web proxy server should include the following aspects: 
+The functionalities of the web proxy server should include the following aspects: 
 * Respond to HTTP & HTTPS requests, and should display each request on a management console. It should forward the request to the Web server and relay the response to the browser. 
 * Handle websocket connections. 
 * Dynamically block selected URLs via the management console. 
