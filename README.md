@@ -1,7 +1,7 @@
 # WebProxyServer #
 
 ## Purpose ##
-The aim of this project is to implement a Web Proxy Server. The pdf version of the problem specification can be found here <a href="https://github.com/adamlkl/WebProxyServer/blob/master/documentation/CS3031_Proj1.pdf">here<a />.
+The aim of this project is to implement a Web Proxy Server. The pdf version of the problem specification can be found here <a href="https://github.com/adamlkl/WebProxyServer/blob/master/documentation/CS3031_Proj1.pdf">here</a>.
 
 ## Introduction ##
 In computer networks, a proxy server is a server that acts as the intermediary application connecting the clients and servers. It is typically used to receive information seeking requests from clients and direct them towards the target servers. The functionalities of proxy servers also encompasses processes such as comprehending and evaluating complex requests before simplifying them. Furthermore, the implementation of proxy servers also adds layers of structure and encapsulation to distributed systems in real world.
